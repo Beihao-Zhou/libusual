@@ -1,5 +1,5 @@
 #include <usual/slab_ts.h>
-#include <usual/slab.h>
+#include <usual/slab_internal.h>
 #include <usual/spinlock.h>
 
 /*
@@ -21,7 +21,7 @@ struct ThreadSafeSlab *thread_safe_slab_create(const char *name, unsigned obj_si
     if (!ts_slab)
         return NULL;
 
-    ts_slab->slab = slab_create(name, obj_size, align, init_func, cx);
+    ts_slab->slab = slab_create_internal(name, obj_size, align, init_func, cx, true);
     if (!ts_slab->slab) {
         free(ts_slab);
         return NULL;
@@ -38,7 +38,7 @@ void thread_safe_slab_destroy(struct ThreadSafeSlab *ts_slab) {
     if (!ts_slab)
         return;
     spin_lock_acquire(&ts_slab->lock);
-    slab_destroy(ts_slab->slab);
+    slab_destroy_internal(ts_slab->slab, true);
     spin_lock_release(&ts_slab->lock);
 }
 

@@ -18,26 +18,13 @@
 
 #include <usual/slab.h>
 
+#include <usual/slab_internal.h>
+
 #include <string.h>
 
 #include <usual/statlist.h>
 
 #ifndef USUAL_FAKE_SLAB
-
-/*
- * Store for pre-initialized objects of one type.
- */
-struct Slab {
-	struct List head;
-	struct StatList freelist;
-	struct StatList fraglist;
-	char name[32];
-	unsigned final_size;
-	unsigned total_count;
-	slab_init_fn  init_func;
-	CxMem *cx;
-};
-
 
 /*
  * Header for each slab.
@@ -46,27 +33,10 @@ struct SlabFrag {
 	struct List head;
 };
 
-/* keep track of all active slabs */
-static STATLIST(slab_list);
-
-static void slab_list_append(struct Slab *slab)
-{
-#ifndef _REENTRANT
-	statlist_append(&slab_list, &slab->head);
-#endif
-}
-
-static void slab_list_remove(struct Slab *slab)
-{
-#ifndef _REENTRANT
-	statlist_remove(&slab_list, &slab->head);
-#endif
-}
-
 /* fill struct contents */
 static void init_slab(struct Slab *slab, const char *name, unsigned obj_size,
 		      unsigned align, slab_init_fn init_func,
-		      CxMem *cx)
+		      CxMem *cx, bool is_thread_safe)
 {
 	unsigned slen = strlen(name);
 
@@ -96,7 +66,16 @@ static void init_slab(struct Slab *slab, const char *name, unsigned obj_size,
 	if (slab->final_size < sizeof(struct List))
 		slab->final_size = sizeof(struct List);
 
-	slab_list_append(slab);
+	slab_list_append(slab, is_thread_safe);
+}
+
+struct Slab *slab_create_internal(const char *name, unsigned obj_size, unsigned align,
+			 slab_init_fn init_func, CxMem *cx, bool is_thread_safe) 
+{
+	struct Slab *slab = cx_alloc0(cx, sizeof(*slab));
+	if (slab)
+		init_slab(slab, name, obj_size, align, init_func, cx, is_thread_safe);
+	return slab;
 }
 
 /* make new slab */
@@ -104,17 +83,10 @@ struct Slab *slab_create(const char *name, unsigned obj_size, unsigned align,
 			 slab_init_fn init_func,
 			 CxMem *cx)
 {
-	struct Slab *slab;
-
-	/* new slab object */
-	slab = cx_alloc0(cx, sizeof(*slab));
-	if (slab)
-		init_slab(slab, name, obj_size, align, init_func, cx);
-	return slab;
+	return slab_create_internal(name, obj_size, align, init_func, cx, false);
 }
 
-/* free all storage associated by slab */
-void slab_destroy(struct Slab *slab)
+void slab_destroy_internal(struct Slab *slab, bool is_thread_safe)
 {
 	struct List *item, *tmp;
 	struct SlabFrag *frag;
@@ -122,12 +94,17 @@ void slab_destroy(struct Slab *slab)
 	if (!slab)
 		return;
 
-	slab_list_remove(slab);
+	slab_list_remove(slab, is_thread_safe);
 	statlist_for_each_safe(item, &slab->fraglist, tmp) {
 		frag = container_of(item, struct SlabFrag, head);
 		cx_free(slab->cx, frag);
 	}
 	cx_free(slab->cx, slab);
+}
+
+/* free all storage associated by slab */
+void slab_destroy(struct Slab *slab) {
+	slab_destroy_internal(slab, false);
 }
 
 /* add new block of objects to slab */

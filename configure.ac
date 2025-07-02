@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT([libusual],[1.0],[https://libusual.github.com])
+AC_INIT([libusual],[1.0],[https://libusual.github.io])
 AC_CONFIG_SRCDIR(usual/base.h)
 AC_CONFIG_HEADERS([usual/config.h])
 AC_PREREQ([2.59])
@@ -34,6 +34,7 @@ AC_PTHREAD
 dnl search for common libraries
 # Required for infinite() on FreeBSD:
 AC_CHECK_LIB(m, main)
+AC_CHECK_FUNCS([pthread_threadid_np])
 AC_SEARCH_LIBS(clock_gettime, rt)
 AC_SEARCH_LIBS(getsockname, socket)
 AC_SEARCH_LIBS(gethostbyname, nsl)

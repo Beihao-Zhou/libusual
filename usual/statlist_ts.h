@@ -15,9 +15,10 @@ struct ThreadSafeStatList {
 };
 
 /** Initialize ThreadSafeStatList head */
-static inline void thread_safe_statlist_init(struct ThreadSafeStatList *list, const char *name) {
+static inline void thread_safe_statlist_init(struct ThreadSafeStatList *list, const char *name, bool enable_recursive_lock) {
     statlist_init(&list->list, name);
     spin_lock_init(&list->lock);
+    set_recursive(&list->lock, enable_recursive_lock);
 }
 
 /** Add to the start of the list */
@@ -100,22 +101,30 @@ static inline void thread_safe_statlist_put_after(struct ThreadSafeStatList *lis
     spin_lock_release(&list->lock);
 }
 
-/** Loop over thread-safe list */
-static inline void thread_safe_statlist_iterate(struct ThreadSafeStatList *list, void (*func)(struct List *)) {
+/** Loop over thread-safe list (with context) */
+static inline void thread_safe_statlist_iterate(
+    struct ThreadSafeStatList *list,
+    void (*func)(struct List *, void *),
+    void *ctx)
+{
     struct List *item;
     spin_lock_acquire(&list->lock);
     statlist_for_each(item, &list->list) {
-        func(item);
+        func(item, ctx);
     }
     spin_lock_release(&list->lock);
 }
 
-/** Loop over thread-safe list backwards */
-static inline void thread_safe_statlist_iterate_reverse(struct ThreadSafeStatList *list, void (*func)(struct List *)) {
+/** Loop over thread-safe list backwards (with context) */
+static inline void thread_safe_statlist_iterate_reverse(
+    struct ThreadSafeStatList *list,
+    void (*func)(struct List *, void *),
+    void *ctx)
+{
     struct List *item;
     spin_lock_acquire(&list->lock);
     statlist_for_each_reverse(item, &list->list) {
-        func(item);
+        func(item, ctx);
     }
     spin_lock_release(&list->lock);
 }

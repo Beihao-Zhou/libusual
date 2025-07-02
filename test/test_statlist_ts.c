@@ -9,7 +9,7 @@ static void test_thread_safe_statlist_simple(void *p) {
     struct List node1, node2, node3;
     struct List *popped_node;
 
-    thread_safe_statlist_init(&ts_list, "test_list");
+    thread_safe_statlist_init(&ts_list, "test_list", false);
 
     spin_lock_acquire(&ts_list.lock);
     str_check(statlist_count(&ts_list.list) == 0 ? "OK" : "FAIL", "OK");
@@ -60,7 +60,7 @@ static void *thread_worker(void *arg) {
 
 static void test_thread_safe_statlist_multithreaded(void *p) {
     pthread_t threads[NUM_THREADS];
-    thread_safe_statlist_init(&ts_list, "test_list");
+    thread_safe_statlist_init(&ts_list, "test_list", false);
     srand(time(NULL));
 
     for (int i = 0; i < NUM_THREADS; i++) {
@@ -80,18 +80,18 @@ end:;
 
 
 /* iteration */
-
-static int element_count = 0;
-static void count_elements(struct List *item) {
-    element_count++;
+static void count_elements(struct List *item, void *ctx) {
+    int *counter = (int *)ctx;
+    (*counter)++;
 }
 
 static void test_thread_safe_statlist_iteration(void *p) {
     struct ThreadSafeStatList ts_list;
     struct List node1, node2, node3;
+    int element_count;
 
-    thread_safe_statlist_init(&ts_list, "test_list_iteration");
-    
+    thread_safe_statlist_init(&ts_list, "test_list_iteration", false);
+
     list_init(&node1);
     list_init(&node2);
     list_init(&node3);
@@ -101,11 +101,11 @@ static void test_thread_safe_statlist_iteration(void *p) {
     thread_safe_statlist_append(&ts_list, &node3);
 
     element_count = 0;
-    thread_safe_statlist_iterate(&ts_list, count_elements);
+    thread_safe_statlist_iterate(&ts_list, count_elements, &element_count);
     str_check(element_count == 3 ? "OK" : "FAIL", "OK");
 
     element_count = 0;
-    thread_safe_statlist_iterate_reverse(&ts_list, count_elements);
+    thread_safe_statlist_iterate_reverse(&ts_list, count_elements, &element_count);
     str_check(element_count == 3 ? "OK" : "FAIL", "OK");
 
 end:;
